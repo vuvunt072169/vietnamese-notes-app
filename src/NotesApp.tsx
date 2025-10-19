@@ -1,18 +1,10 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
-import { Id } from "../convex/_generated/dataModel";
+import { Id, Doc } from "../convex/_generated/dataModel";
 import { toast } from "sonner";
 
-interface Note {
-  _id: Id<"notes">;
-  title: string;
-  content: string;
-  tags: string[];
-  _creationTime: number;
-  storageId?: Id<"_storage">;
-  imageUrl?: string;
-}
+type Note = Doc<"notes">;
 
 export function NotesApp() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -56,7 +48,11 @@ export function NotesApp() {
 
   const handleUpdateNote = async (id: Id<"notes">, title: string, content: string, tags: string[], file?: File, imageUrl?: string) => {
     try {
-      let storageId: Id<"_storage"> | undefined = editingNote?.storageId;
+      // Start with the original image/file values
+      let finalStorageId: Id<"_storage"> | undefined = editingNote?.storageId;
+      let finalImageUrl: string | undefined = editingNote?.imageUrl;
+
+      // Has the user provided a new file?
       if (file) {
         const postUrl = await generateUploadUrl();
         const result = await fetch(postUrl, {
@@ -64,11 +60,25 @@ export function NotesApp() {
           headers: { "Content-Type": file.type },
           body: file,
         });
-        const { storageId: newStorageId } = await result.json();
-        storageId = newStorageId;
+        const { storageId } = await result.json();
+        finalStorageId = storageId;
+        finalImageUrl = undefined; // New file takes precedence
+      } 
+      // If no new file, has the user changed the image URL?
+      else if (imageUrl !== editingNote?.imageUrl) {
+        finalImageUrl = imageUrl;
+        finalStorageId = undefined; // New URL takes precedence
       }
 
-      await updateNote({ id, title, content, tags, storageId, imageUrl });
+      await updateNote({ 
+        id, 
+        title, 
+        content, 
+        tags, 
+        storageId: finalStorageId, 
+        imageUrl: finalImageUrl 
+      });
+
       setEditingNote(null);
       toast.success("Đã cập nhật ghi chú!");
     } catch (error) {
@@ -139,7 +149,28 @@ export function NotesApp() {
           )}
         </div>
 
-       
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {notes.map((note) => (
+            <NoteCard
+              key={note._id}
+              note={note}
+              onEdit={() => setEditingNote(note)}
+              onDelete={async () => {
+                try {
+                  await deleteNote({ id: note._id });
+                  toast.success("Đã xóa ghi chú!");
+                } catch (error) {
+                  console.error(error);
+                  toast.error("Lỗi khi xóa ghi chú");
+                }
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function NoteForm({ 
   note, 
