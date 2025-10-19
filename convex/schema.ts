@@ -8,6 +8,8 @@ const applicationTables = {
     content: v.string(),
     tags: v.array(v.string()),
     userId: v.id("users"),
+    storageId: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .searchIndex("search_content", {

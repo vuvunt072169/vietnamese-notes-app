@@ -2,6 +2,10 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
+export const generateUploadUrl = mutation(async (ctx) => {
+  return await ctx.storage.generateUploadUrl();
+});
+
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -10,11 +14,18 @@ export const list = query({
       return [];
     }
     
-    return await ctx.db
+    const notes = await ctx.db
       .query("notes")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .collect();
+
+    return Promise.all(
+      notes.map(async (note) => ({
+        ...note,
+        imageUrl: note.storageId ? await ctx.storage.getUrl(note.storageId) : note.imageUrl,
+      }))
+    );
   },
 });
 
@@ -81,6 +92,8 @@ export const create = mutation({
     title: v.string(),
     content: v.string(),
     tags: v.array(v.string()),
+    storageId: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -93,6 +106,8 @@ export const create = mutation({
       content: args.content,
       tags: args.tags,
       userId,
+      storageId: args.storageId,
+      imageUrl: args.imageUrl,
     });
   },
 });
@@ -103,6 +118,8 @@ export const update = mutation({
     title: v.string(),
     content: v.string(),
     tags: v.array(v.string()),
+    storageId: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -119,6 +136,8 @@ export const update = mutation({
       title: args.title,
       content: args.content,
       tags: args.tags,
+      storageId: args.storageId,
+      imageUrl: args.imageUrl,
     });
   },
 });
